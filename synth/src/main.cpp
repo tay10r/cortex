@@ -6,10 +6,11 @@
 #include <FastNoiseLite.h>
 
 #include <filesystem>
-#include <sstream>
-#include <iostream>
+#include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <random>
+#include <sstream>
 #include <vector>
 
 #include <math.h>
@@ -148,13 +149,7 @@ does_not_overlap(const std::vector<cell>& cells, const cell& c) -> bool
 void
 generate(std::mt19937& rng, const std::filesystem::path& outdir, const int sample_min, const int sample_max)
 {
-  const char* class_names[]{
-      "Basophil",
-      "Eosinophil",
-      "Monocyte",
-      "Lymphocyte",
-      "Neutrophil"
-  };
+  const char* class_names[]{ "Basophil", "Eosinophil", "Monocyte", "Lymphocyte", "Neutrophil" };
 
   const auto num_classes{ sizeof(class_names) / sizeof(class_names[0]) };
 
@@ -168,20 +163,18 @@ generate(std::mt19937& rng, const std::filesystem::path& outdir, const int sampl
 
   // simulate bias
   std::uniform_int_distribution<int> count_dist(sample_min, sample_max);
-  const std::vector<int> counts{
-      count_dist(rng),
-      count_dist(rng),
-      count_dist(rng),
-      count_dist(rng),
-      count_dist(rng)
-  };
+  const std::vector<int> counts{ count_dist(rng), count_dist(rng), count_dist(rng), count_dist(rng), count_dist(rng) };
+
+  const auto x_max{ w * micrometers_per_pixel };
+  const auto y_max{ h * micrometers_per_pixel };
 
   std::uniform_real_distribution<float> r_dist(5, 10);
-  std::uniform_real_distribution<float> x_dist(0, 20);
-  std::uniform_real_distribution<float> y_dist(0, 20);
+  std::uniform_real_distribution<float> r2_dist(2, 4);
+  std::uniform_real_distribution<float> x_dist(0, x_max);
+  std::uniform_real_distribution<float> y_dist(0, y_max);
   std::uniform_int_distribution<int> k_dist(0, 6);
   std::uniform_real_distribution<float> angle_dist(0, 6.28F);
-  std::uniform_int_distribution<int> neighbors_dist(0, 2);
+  std::uniform_int_distribution<int> neighbors_dist(0, 6);
 
   for (auto class_id = 0; class_id < counts.size(); class_id++) {
 
@@ -189,9 +182,14 @@ generate(std::mt19937& rng, const std::filesystem::path& outdir, const int sampl
 
     for (auto i = 0; i < num_samples; i++) {
 
-      std::vector<cell> cells{
-        cell{ w * 0.5F * micrometers_per_pixel, h * 0.5F * micrometers_per_pixel, r_dist(rng), angle_dist(rng), /*kind=*/class_id }
-      };
+      std::cout << class_names[class_id] << ": " << i << "/" << num_samples << std::endl;
+
+      // note the +1 on the class ID. This is because class 0 is actually a null class (simulates an RBC)
+      std::vector<cell> cells{ cell{ w * 0.5F * micrometers_per_pixel,
+                                     h * 0.5F * micrometers_per_pixel,
+                                     r_dist(rng),
+                                     angle_dist(rng),
+                                     /*kind=*/(class_id + 1) } };
 
       const auto num_neighbors{ neighbors_dist(rng) };
 
@@ -199,7 +197,10 @@ generate(std::mt19937& rng, const std::filesystem::path& outdir, const int sampl
 
         while (true) {
 
-          cell c{ x_dist(rng), y_dist(rng), r_dist(rng), angle_dist(rng), /*kind=*/k_dist(rng) };
+          const auto k = k_dist(rng);
+          const auto r = (k == 0) ? r2_dist(rng) : r_dist(rng);
+
+          cell c{ x_dist(rng), y_dist(rng), r, angle_dist(rng), /*kind=*/k };
 
           if (does_not_overlap(cells, c)) {
             cells.emplace_back(c);
@@ -217,14 +218,14 @@ generate(std::mt19937& rng, const std::filesystem::path& outdir, const int sampl
       {
         std::ostringstream name_stream;
         name_stream << std::setw(4) << std::setfill('0') << i << ".png";
-        const auto path = (outdir / class_names[class_id] / name_stream.str()).string();
+        const auto path = (outdir / "color" / class_names[class_id] / name_stream.str()).string();
         stbi_write_png(path.c_str(), w, h, 3, rgb.data(), w * 3);
       }
 
       {
         std::ostringstream name_stream;
-        name_stream << std::setw(4) << std::setfill('0') << i << "_mask" << ".png";
-        const auto path = (outdir / class_names[class_id] / name_stream.str()).string();
+        name_stream << std::setw(4) << std::setfill('0') << i << ".png";
+        const auto path = (outdir / "mask" / class_names[class_id] / name_stream.str()).string();
         stbi_write_png(path.c_str(), w, h, 1, mask.data(), w);
       }
     }
