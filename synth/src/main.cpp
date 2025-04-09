@@ -1,9 +1,14 @@
+// For Microsoft compiler to define pi constant:
+#define _USE_MATH_DEFINES 1
+
 #include <stb_image_write.h>
 
 #include <FastNoiseLite.h>
 
 #include <filesystem>
+#include <sstream>
 #include <iostream>
+#include <iomanip>
 #include <random>
 #include <vector>
 
@@ -12,7 +17,9 @@
 
 namespace {
 
-const auto micrometers_per_pixel{ 0.2F };
+constexpr auto micrometers_per_pixel{ 0.05F };
+constexpr auto w{ 575 };
+constexpr auto h{ 575 };
 
 using rng_type = std::mt19937;
 
@@ -70,7 +77,7 @@ shade(const cell& c, const float theta, const float r) -> float
 }
 
 void
-render(const std::vector<cell>& cells, const int w, const int h, uint8_t* rgb)
+render(const std::vector<cell>& cells, const int w, const int h, uint8_t* rgb, uint8_t* mask)
 {
   const auto num_pixels{ w * h };
 
@@ -84,8 +91,8 @@ render(const std::vector<cell>& cells, const int w, const int h, uint8_t* rgb)
     const auto x{ static_cast<float>(xi) * micrometers_per_pixel };
     const auto y{ static_cast<float>(yi) * micrometers_per_pixel };
 
-    auto pixel{ 0 };
-
+    auto pixel{ 0.0F };
+    auto m_pixel{ 0 };
     auto k{ 0 };
 
     for (const auto& c : cells) {
@@ -102,6 +109,9 @@ render(const std::vector<cell>& cells, const int w, const int h, uint8_t* rgb)
         const auto ndy{ dy / mag };
         const auto angle = fmodf(c.angle + atan2(ndy, ndx), 2.0F * M_PI);
         pixel += shade(c, angle, nr);
+        if (c.kind != 0) {
+          m_pixel = 255;
+        }
         k += 1;
       }
     }
@@ -115,6 +125,8 @@ render(const std::vector<cell>& cells, const int w, const int h, uint8_t* rgb)
     rgb[i * 3 + 0] = p;
     rgb[i * 3 + 1] = p;
     rgb[i * 3 + 2] = p;
+
+    mask[i] = m_pixel;
   }
 }
 
@@ -134,11 +146,88 @@ does_not_overlap(const std::vector<cell>& cells, const cell& c) -> bool
 }
 
 void
-generate(const int num_frames, std::mt19937& rng, const std::filesystem::path& outdir)
+generate(std::mt19937& rng, const std::filesystem::path& outdir, const int sample_min, const int sample_max)
 {
-  std::filesystem::create_directory(outdir);
+  const char* class_names[]{
+      "Basophil",
+      "Eosinophil",
+      "Monocyte",
+      "Lymphocyte",
+      "Neutrophil"
+  };
 
-  for (auto i = 0; i < num_frames; i++) {
+  const auto num_classes{ sizeof(class_names) / sizeof(class_names[0]) };
+
+  std::filesystem::create_directory(outdir);
+  std::filesystem::create_directory(outdir / "color");
+  std::filesystem::create_directory(outdir / "mask");
+  for (size_t i = 0; i < num_classes; i++) {
+    std::filesystem::create_directory(outdir / "color" / class_names[i]);
+    std::filesystem::create_directory(outdir / "mask" / class_names[i]);
+  }
+
+  // simulate bias
+  std::uniform_int_distribution<int> count_dist(sample_min, sample_max);
+  const std::vector<int> counts{
+      count_dist(rng),
+      count_dist(rng),
+      count_dist(rng),
+      count_dist(rng),
+      count_dist(rng)
+  };
+
+  std::uniform_real_distribution<float> r_dist(5, 10);
+  std::uniform_real_distribution<float> x_dist(0, 20);
+  std::uniform_real_distribution<float> y_dist(0, 20);
+  std::uniform_int_distribution<int> k_dist(0, 6);
+  std::uniform_real_distribution<float> angle_dist(0, 6.28F);
+  std::uniform_int_distribution<int> neighbors_dist(0, 2);
+
+  for (auto class_id = 0; class_id < counts.size(); class_id++) {
+
+    const auto num_samples{ counts[class_id] };
+
+    for (auto i = 0; i < num_samples; i++) {
+
+      std::vector<cell> cells{
+        cell{ w * 0.5F * micrometers_per_pixel, h * 0.5F * micrometers_per_pixel, r_dist(rng), angle_dist(rng), /*kind=*/class_id }
+      };
+
+      const auto num_neighbors{ neighbors_dist(rng) };
+
+      for (auto j = 0; j < num_neighbors; j++) {
+
+        while (true) {
+
+          cell c{ x_dist(rng), y_dist(rng), r_dist(rng), angle_dist(rng), /*kind=*/k_dist(rng) };
+
+          if (does_not_overlap(cells, c)) {
+            cells.emplace_back(c);
+            break;
+          }
+        }
+      }
+
+      std::vector<uint8_t> rgb(w * h * 3, 0);
+
+      std::vector<uint8_t> mask(w * h, 0);
+
+      render(cells, w, h, rgb.data(), mask.data());
+
+      {
+        std::ostringstream name_stream;
+        name_stream << std::setw(4) << std::setfill('0') << i << ".png";
+        const auto path = (outdir / class_names[class_id] / name_stream.str()).string();
+        stbi_write_png(path.c_str(), w, h, 3, rgb.data(), w * 3);
+      }
+
+      {
+        std::ostringstream name_stream;
+        name_stream << std::setw(4) << std::setfill('0') << i << "_mask" << ".png";
+        const auto path = (outdir / class_names[class_id] / name_stream.str()).string();
+        stbi_write_png(path.c_str(), w, h, 1, mask.data(), w);
+      }
+    }
   }
 }
 
@@ -178,47 +267,8 @@ main() -> int
 
   rng_type rng(seed);
 
-  std::uniform_real_distribution<float> r_dist(5, 20);
-  // std::uniform_real_distribution<float> x_dist(20, 80);
-  // std::uniform_real_distribution<float> y_dist(20, 80);
-  std::uniform_real_distribution<float> x_dist(5, 40);
-  std::uniform_real_distribution<float> y_dist(5, 40);
-  std::uniform_int_distribution<int> k_dist(0, 6);
-  std::uniform_real_distribution<float> angle_dist(0, 6.28F);
-
-  const auto w{ 575 };
-  const auto h{ 575 };
-
-  const auto num_train_frames{ 16 };
-
-  const auto num_test_frames{ 16 };
-
-  for (auto i = 0; i < num_test_frames; i++) {
-  }
-
-  std::vector<cell> cells;
-
-  const auto num_cells{ 5 };
-
-  for (auto i = 0; i < num_cells; i++) {
-
-    while (true) {
-
-      cell c{ x_dist(rng), y_dist(rng), r_dist(rng), angle_dist(rng), /*kind=*/k_dist(rng) };
-
-      if (does_not_overlap(cells, c)) {
-        std::cout << c.x << ' ' << c.y << ' ' << c.r << std::endl;
-        cells.emplace_back(c);
-        break;
-      }
-    }
-  }
-
-  std::vector<uint8_t> rgb(w * h * 3, 0);
-
-  render(cells, w, h, rgb.data());
-
-  stbi_write_png("result.png", w, h, 3, rgb.data(), w * 3);
+  generate(rng, "train", 200, 1000);
+  generate(rng, "test", 100, 100);
 
   return EXIT_SUCCESS;
 }
