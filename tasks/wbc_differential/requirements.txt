@@ -1,0 +1,6 @@
+torch==2.6
+torchvision==0.21
+onnx==1.17
+tensorboard==2.19
+mlflow==2.21
+loguru==0.7.3

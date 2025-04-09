@@ -1,0 +1,36 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Train Classifier",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "main",
+            "args": [
+                "--mode=classifier",
+                "--dataset=./data",
+                "--model-name=WBC_Classifier",
+                "--model-version-major=1",
+                "--model-version-minor=0",
+                "--trackers=console,mlflow,tensorboard"
+            ]
+        },
+        {
+            "name": "Train Localizer",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "main",
+            "args": [
+                "--mode=localizer",
+                "--dataset=./data",
+                "--model-name=WBC_Localizer",
+                "--model-version-major=1",
+                "--model-version-minor=0",
+                "--trackers=console,mlflow,tensorboard"
+            ]
+        }
+    ]
+}

@@ -19,8 +19,8 @@
 namespace {
 
 constexpr auto micrometers_per_pixel{ 0.05F };
-constexpr auto w{ 575 };
-constexpr auto h{ 575 };
+constexpr auto w{ 4096 };
+constexpr auto h{ 2048 };
 
 using rng_type = std::mt19937;
 

@@ -3,3 +3,8 @@ __pycache__
 .venv
 build
 .cache
+tasks/wbc_differential/data
+*.onnx
+mlartifacts
+mlruns
+runs
