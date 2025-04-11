@@ -86,7 +86,7 @@ if __name__ == "__main__":
                         help='The batch size to use when training.')
     parser.add_argument('--learning-rate',
                         type=float,
-                        default=1.0e-4,
+                        default=1.0e-3,
                         help='The learning rate to assign the optimizer.')
     parser.add_argument('--epochs',
                         type=int,

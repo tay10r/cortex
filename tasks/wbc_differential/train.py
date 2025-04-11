@@ -42,7 +42,10 @@ class TensorboardTracker(Tracker):
 
     def log_metrics(self, metrics: dict[str, float], epoch: int):
         for tag, value in metrics.items():
-            self.writer.add_scalar(tag, value, epoch)
+            if isinstance(value, float):
+                self.writer.add_scalar(tag, value, epoch)
+            elif isinstance(value, Tensor):
+                self.writer.add_image(tag, value, epoch)
 
     def log_model(self, model: nn.Module):
         pass
@@ -60,7 +63,8 @@ class MLFlowTracker(Tracker):
 
     def log_metrics(self, metrics: dict[str, float], epoch: int):
         for tag, value in metrics.items():
-            mlflow.log_metric(tag, value, step=epoch)
+            if isinstance(value, float):
+                mlflow.log_metric(tag, value, step=epoch)
 
     def log_model(self, model: nn.Module):
         mlflow.pytorch.log_model(model, 'models')
@@ -77,7 +81,8 @@ class ConsoleTracker(Tracker):
     def log_metrics(self, metrics: dict[str, float], epoch: int):
         values = ''
         for tag, value in metrics.items():
-            values += f' {tag}={value}'
+            if isinstance(value, float):
+                values += f' {tag}={value}'
         logger.info(f'[{epoch}]:{values}')
 
     def log_model(self, model: nn.Module):

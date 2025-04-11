@@ -6,7 +6,6 @@
 #include <FastNoiseLite.h>
 
 #include <filesystem>
-#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <random>
@@ -174,7 +173,7 @@ generate(std::mt19937& rng, const std::filesystem::path& outdir, const int sampl
   std::uniform_real_distribution<float> y_dist(0, y_max);
   std::uniform_int_distribution<int> k_dist(0, 6);
   std::uniform_real_distribution<float> angle_dist(0, 6.28F);
-  std::uniform_int_distribution<int> neighbors_dist(0, 6);
+  std::uniform_int_distribution<int> neighbors_dist(0, 8);
 
   for (auto class_id = 0; class_id < counts.size(); class_id++) {
 
@@ -217,9 +216,9 @@ generate(std::mt19937& rng, const std::filesystem::path& outdir, const int sampl
 
       {
         std::ostringstream name_stream;
-        name_stream << std::setw(4) << std::setfill('0') << i << ".png";
+        name_stream << std::setw(4) << std::setfill('0') << i << ".jpg";
         const auto path = (outdir / "color" / class_names[class_id] / name_stream.str()).string();
-        stbi_write_png(path.c_str(), w, h, 3, rgb.data(), w * 3);
+        stbi_write_jpg(path.c_str(), w, h, 3, rgb.data(), /*quality=*/70);
       }
 
       {
@@ -268,7 +267,7 @@ main() -> int
 
   rng_type rng(seed);
 
-  generate(rng, "train", 200, 1000);
+  generate(rng, "train", 200, 300);
   generate(rng, "test", 100, 100);
 
   return EXIT_SUCCESS;

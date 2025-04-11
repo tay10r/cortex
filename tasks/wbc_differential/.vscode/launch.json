@@ -15,7 +15,7 @@
                 "--model-name=WBC_Classifier",
                 "--model-version-major=1",
                 "--model-version-minor=0",
-                "--trackers=console,mlflow,tensorboard"
+                "--trackers=console,tensorboard"
             ]
         },
         {
@@ -29,7 +29,7 @@
                 "--model-name=WBC_Localizer",
                 "--model-version-major=1",
                 "--model-version-minor=0",
-                "--trackers=console,mlflow,tensorboard"
+                "--trackers=console,tensorboard"
             ]
         }
     ]
