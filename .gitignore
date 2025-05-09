@@ -11,3 +11,4 @@ services/app/images/*.bin
 services/app/config.json
 model/config.json
 *.onnx
+.ipynb_checkpoints

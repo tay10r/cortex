@@ -13,11 +13,6 @@ from scopenet.ssim import SSIMLoss
 
 def main():
     config: Config = open_config()
-    if config.device == '':
-        if torch.cuda.is_available():
-            config.device = 'cuda:0'
-        else:
-            config.device = 'cpu:0'
     device = torch.device(config.device)
     logger.info(f'Torch Device: {device.type}:{device.index}')
     train_data = Dataset(Path(config.dataset_root) / 'train')
