@@ -41,7 +41,7 @@ class TrainingSession:
 
     def run_epoch(self, net: nn.Module, loss_fn: Callable[[Tensor, Tensor], Tensor]):
         if self.__optimizer is None:
-            self.__optimizer = optim.AdamW(net.parameters())
+            self.__optimizer = optim.AdamW(net.parameters(), lr=0.0001)
         self._run_train_epoch(net, loss_fn)
         test_loss: float = self._run_test_epoch(net, loss_fn)
         if test_loss < self.__best_loss:
@@ -52,15 +52,15 @@ class TrainingSession:
     def _save_onnx(self, net: nn.Module):
         filename = f'{self.__model_name}-{self.__model_version}.onnx'
         net.to('cpu')
-        x = torch.randn((1, 3, 512, 512))
+        x = torch.randn((1, 3, 2304, 2304))
         torch.onnx.export(net,
                           x,
                           filename,
                           input_names=['image'],
                           output_names=['reconstructed'],
                           dynamic_axes={
-                              'image': {0: 'batch_size'},
-                              'reconstructed': {0: 'batch_size'}
+                              'image': {0: 'batch_size', 2: 'width', 3: 'height'},
+                              'reconstructed': {0: 'batch_size', 2: 'width', 3: 'height'}
                           },
                           opset_version=11)
         net.to(self.__device)

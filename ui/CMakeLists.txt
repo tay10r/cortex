@@ -88,6 +88,8 @@ target_link_libraries(cortex_ui
     shaders
 )
 
+target_compile_features(cortex_ui PUBLIC cxx_std_17)
+
 if(EMSCRIPTEN)
   #target_compile_options(cortex_ui PRIVATE "SHELL: -s FETCH=1")
   # initial memory = 48 MiB
