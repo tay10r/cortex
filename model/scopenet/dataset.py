@@ -11,10 +11,8 @@ from scopenet.zstack import ZStack
 
 
 class _Transform(transforms.Transform):
-    def forward(self, x: Tensor | Image.Image) -> Tensor:
-        x = FT.to_image(x)
-        x = FT.to_dtype(x, torch.float, scale=True)
-        return x
+    def forward(self, x: Tensor, target: Tensor) -> Tensor:
+        return x, target
 
 
 class Dataset(DatasetBase):
@@ -46,7 +44,7 @@ class Dataset(DatasetBase):
         img = Dataset.__image_to_tensor(stack[slice_index])
         target = Dataset.__image_to_tensor(stack[stack.get_best_focus_index()])
         if self.__transform is not None:
-            return self.__transform(img), target
+            return self.__transform(img, target)
         return img, target
 
     @staticmethod
