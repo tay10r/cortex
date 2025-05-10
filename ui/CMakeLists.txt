@@ -95,3 +95,7 @@ if(EMSCRIPTEN)
   # initial memory = 48 MiB
   target_link_options(cortex_ui PRIVATE "SHELL: -sFETCH -sINITIAL_MEMORY=50331648")
 endif()
+
+# For local testing and deployment to Github pages:
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/../services/app/static/index.html"
+  DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
