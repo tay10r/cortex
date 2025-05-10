@@ -1,0 +1,52 @@
+name: Build and Deploy Web UI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+  BUILD_DIR: build
+  DEPLOY_DIR: public
+
+jobs:
+  build-web-ui:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Emscripten
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.45  # Update to match your Emscripten version requirements
+
+    - name: Create build directory
+      run: mkdir ${{env.BUILD_DIR}}
+
+    - name: Configure CMake with Emscripten
+      run: |
+        emcmake cmake -S ui -B ${{env.BUILD_DIR}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+    - name: Build with Emscripten
+      run: cmake --build ${{env.BUILD_DIR}} --config ${{env.BUILD_TYPE}}
+
+    # Optional: run any browser-compatible tests you have here
+
+    - name: Prepare deployment directory
+      run: |
+        mkdir -p ${{env.DEPLOY_DIR}}
+        cp ${{env.BUILD_DIR}}/*.html ${{env.DEPLOY_DIR}} || true
+        cp ${{env.BUILD_DIR}}/*.js ${{env.DEPLOY_DIR}} || true
+        cp ${{env.BUILD_DIR}}/*.wasm ${{env.DEPLOY_DIR}} || true
+        cp -r assets ${{env.DEPLOY_DIR}} || true  # If you have assets
+
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ${{env.DEPLOY_DIR}}
