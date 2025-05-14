@@ -12,3 +12,5 @@ services/app/config.json
 model/config.json
 *.onnx
 .ipynb_checkpoints
+model/runs
+model/config
