@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Response
+import time
+import struct
+from fastapi import FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from picamera2 import Picamera2
-import time
 import uvicorn
 
 X_RESOLUTION = 3280
@@ -25,12 +26,9 @@ config = picam2.create_still_configuration(raw={'format': 'SRGGB10', 'size': (X_
 picam2.configure(config)
 picam2.start()
 
-# Warm up
-time.sleep(1)
-
 class CameraConfig(BaseModel):
-    exposure: float | None = None  # in microseconds
-    gain: float | None = None      # analog gain
+    exposure: int
+    gain: float
 
 @app.get('/snapshot')
 async def capture_raw_bayer():
@@ -47,29 +45,31 @@ async def capture_raw_bayer():
 @app.get('/config')
 async def get_config():
     metadata = picam2.capture_metadata()
-    return {
-        'exposure': metadata.get('ExposureTime', None),
-        'gain': metadata.get('AnalogueGain', None)
-    }
+    exposure = int(metadata.get('ExposureTime', 0))
+    gain = float(metadata.get('AnalogueGain', 0.0))
+    packed = struct.pack('<If', exposure, gain)
+    return Response(content=packed, media_type='application/octet-stream')
 
-@app.post('/config')
-async def set_config(config: CameraConfig):
-    controls = {}
-
-    if config.exposure is not None:
-        controls['ExposureTime'] = int(config.exposure)  # microseconds
-    if config.gain is not None:
-        controls['AnalogueGain'] = float(config.gain)
-
-    if not controls:
-        raise HTTPException(status_code=400, detail='No valid parameters provided.')
-
+@app.put('/config')
+async def set_config(request: Request):
     try:
-        picam2.set_controls(controls)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        body = await request.body()
 
-    return {}
+        if len(body) != 8:
+            raise ValueError("Expected 8 bytes: 4 for gain (float32), 4 for exposure (uint32)")
+
+        # Unpack LE binary: float32 gain, uint32 exposure
+        exposure, gain = struct.unpack('<If', body)
+
+        picam2.set_controls({
+            "AnalogueGain": gain,
+            "ExposureTime": exposure
+        })
+
+        return Response(content=b"ok", media_type="text/plain")
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 if __name__ == '__main__':
     uvicorn.run('your_filename:app', host='0.0.0.0', port=6500)

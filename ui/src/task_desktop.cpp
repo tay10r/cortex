@@ -1,7 +1,10 @@
-#include "transfer.h"
+#include "task.h"
 
 #include <map>
 #include <string>
+#include <thread>
+
+#include <boost/beast.hpp>
 
 namespace cortex {
 
@@ -123,7 +126,15 @@ make_images_response() -> response
   return resp;
 }
 
-class transfer_impl final : public transfer
+[[nodiscard]] auto
+make_config_get_response() -> response
+{
+  response resp;
+  resp.body = std::string("\x00\x00\x00\x00\x00\x00\x00\x00", static_cast<size_t>(8));
+  return resp;
+}
+
+class task_impl final : public task
 {
   std::string url_;
 
@@ -136,7 +147,7 @@ class transfer_impl final : public transfer
   bool failed_{ false };
 
 public:
-  explicit transfer_impl(std::string url)
+  explicit task_impl(std::string url)
     : url_(std::move(url))
   {
   }
@@ -180,6 +191,8 @@ protected:
       response_ = make_sangaboard_response();
     } else if (url_.find("images.json") != std::string::npos) {
       response_ = make_images_response();
+    } else if (url_.find("config") != std::string::npos) {
+      response_ = make_config_get_response();
     } else {
       failed_ = true;
     }
@@ -188,30 +201,33 @@ protected:
   }
 };
 
+class threaded_task : public task
+{};
+
 } // namespace
 
 auto
-transfer::post(const std::string& url, std::string) -> std::unique_ptr<transfer>
+task::http_post(const std::string& url, std::string) -> std::unique_ptr<task>
 {
-  return std::make_unique<transfer_impl>(url);
+  return std::make_unique<task_impl>(url);
 }
 
 auto
-transfer::get(const std::string& url) -> std::unique_ptr<transfer>
+task::http_get(const std::string& url) -> std::unique_ptr<task>
 {
-  return std::make_unique<transfer_impl>(url);
+  return std::make_unique<task_impl>(url);
 }
 
 auto
-transfer::delete_(const std::string& url) -> std::unique_ptr<transfer>
+task::http_delete(const std::string& url) -> std::unique_ptr<task>
 {
-  return std::make_unique<transfer_impl>(url);
+  return std::make_unique<task_impl>(url);
 }
 
 auto
-transfer::put(const std::string& url) -> std::unique_ptr<transfer>
+task::http_put(const std::string& url, std::string) -> std::unique_ptr<task>
 {
-  return std::make_unique<transfer_impl>(url);
+  return std::make_unique<task_impl>(url);
 }
 
 } // namespace cortex

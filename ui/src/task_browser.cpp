@@ -1,4 +1,4 @@
-#include "transfer.h"
+#include "task.h"
 
 #include <emscripten/fetch.h>
 
@@ -9,7 +9,7 @@ namespace cortex {
 
 namespace {
 
-class transfer_impl final : public transfer
+class task_impl final : public task
 {
   emscripten_fetch_attr_t attr_{};
 
@@ -24,7 +24,7 @@ class transfer_impl final : public transfer
   std::string body_;
 
 public:
-  explicit transfer_impl(const char* method, const std::string& url, std::string body)
+  explicit task_impl(const char* method, const std::string& url, std::string body)
     : body_(std::move(body))
   {
     strcpy(attr_.requestMethod, method);
@@ -42,7 +42,7 @@ public:
     fetch_->userData = this;
   }
 
-  ~transfer_impl()
+  ~task_impl()
   {
     if (fetch_) {
       emscripten_fetch_close(fetch_);
@@ -78,10 +78,7 @@ public:
   void poll() override {}
 
 protected:
-  static auto get_self(emscripten_fetch_t* fetch) -> transfer_impl*
-  {
-    return static_cast<transfer_impl*>(fetch->userData);
-  }
+  static auto get_self(emscripten_fetch_t* fetch) -> task_impl* { return static_cast<task_impl*>(fetch->userData); }
 
   static void on_success(emscripten_fetch_t* fetch)
   {
@@ -116,27 +113,27 @@ protected:
 } // namespace
 
 auto
-transfer::post(const std::string& url, std::string body) -> std::unique_ptr<transfer>
+task::http_post(const std::string& url, std::string body) -> std::unique_ptr<task>
 {
-  return std::make_unique<transfer_impl>("POST", url, std::move(body));
+  return std::make_unique<task_impl>("POST", url, std::move(body));
 }
 
 auto
-transfer::get(const std::string& url) -> std::unique_ptr<transfer>
+task::http_get(const std::string& url) -> std::unique_ptr<task>
 {
-  return std::make_unique<transfer_impl>("GET", url, "");
+  return std::make_unique<task_impl>("GET", url, "");
 }
 
 auto
-transfer::delete_(const std::string& url) -> std::unique_ptr<transfer>
+task::http_delete(const std::string& url) -> std::unique_ptr<task>
 {
-  return std::make_unique<transfer_impl>("DELETE", url, "");
+  return std::make_unique<task_impl>("DELETE", url, "");
 }
 
 auto
-transfer::put(const std::string& url) -> std::unique_ptr<transfer>
+task::http_put(const std::string& url, std::string body) -> std::unique_ptr<task>
 {
-  return std::make_unique<transfer_impl>("PUT", url, "");
+  return std::make_unique<task_impl>("PUT", url, std::move(body));
 }
 
 } // namespace cortex

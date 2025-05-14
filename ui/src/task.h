@@ -7,18 +7,18 @@
 
 namespace cortex {
 
-class transfer
+class task
 {
 public:
-  static auto get(const std::string& url) -> std::unique_ptr<transfer>;
+  static auto http_get(const std::string& url) -> std::unique_ptr<task>;
 
-  static auto post(const std::string& url, std::string body) -> std::unique_ptr<transfer>;
+  static auto http_post(const std::string& url, std::string body) -> std::unique_ptr<task>;
 
-  static auto delete_(const std::string& url) -> std::unique_ptr<transfer>;
+  static auto http_delete(const std::string& url) -> std::unique_ptr<task>;
 
-  static auto put(const std::string& url) -> std::unique_ptr<transfer>;
+  static auto http_put(const std::string& url, std::string body) -> std::unique_ptr<task>;
 
-  virtual ~transfer() = default;
+  virtual ~task() = default;
 
   virtual void poll() = 0;
 

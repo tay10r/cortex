@@ -2,7 +2,26 @@ cmake_minimum_required(VERSION 3.18)
 
 project(cortex_ui
   DESCRIPTION "The UI component of the web app."
-  VERSION 1.0)
+  VERSION 1.0
+)
+
+if(NOT EMSCRIPTEN)
+  find_package(Boost CONFIG REQUIRED COMPONENTS system)
+endif()
+
+if(NOT DEFINED MEMORY_LIMIT)
+  # This is the memory limit for the app as a whole,
+  # which includes the stack size, heap size (including all untracked allocations).
+  # 64 MiB
+  set(MEMORY_LIMIT 67108864)
+endif()
+
+if(NOT DEFINED SOFT_MEMORY_LIMIT)
+  # This is the memory limit for large objects (such as images)
+  # that are tracked by the app.
+  # 48 MiB
+  set(SOFT_MEMORY_LIMIT 50331648)
+endif()
 
 if(POLICY CMP0135)
   cmake_policy(SET CMP0135 NEW)
@@ -37,6 +56,35 @@ cmrc_add_resource_library(shaders
   shaders/debayer.frag
 )
 
+#=================#
+# Support Library #
+#=================#
+
+add_library(cortex
+  src/memory.h
+  src/memory.cpp
+  src/task.h
+)
+
+if(EMSCRIPTEN)
+  target_sources(cortex PRIVATE src/task_browser.cpp)
+else()
+  target_sources(cortex PRIVATE src/task_desktop.cpp)
+endif()
+
+target_compile_definitions(cortex
+  PUBLIC
+    SOFT_MEMORY_LIMIT=${SOFT_MEMORY_LIMIT}
+)
+
+if(NOT EMSCRIPTEN)
+  target_link_libraries(cortex PUBLIC Boost::system)
+endif()
+
+#==============#
+# Main Program #
+#==============#
+
 set(sources
   app.cpp
   src/widget.h
@@ -48,7 +96,6 @@ set(sources
   src/gallery_widget.cpp
   src/visualizer.h
   src/visualizer.cpp
-  src/transfer.h
   src/image_index.h
   src/image_index.cpp
   tool.h
@@ -58,12 +105,6 @@ set(sources
   ${texteditor_SOURCE_DIR}/TextEditor.h
   ${texteditor_SOURCE_DIR}/TextEditor.cpp
 )
-
-if(EMSCRIPTEN)
-  list(APPEND sources src/transfer_real.cpp)
-else()
-  list(APPEND sources src/transfer_fake.cpp)
-endif()
 
 add_executable(cortex_ui WIN32 ${sources})
 
@@ -79,6 +120,7 @@ target_link_libraries(cortex_ui
     uikit::main
     stb
     shaders
+    cortex
 )
 
 target_compile_features(cortex_ui PUBLIC cxx_std_17)
@@ -86,7 +128,7 @@ target_compile_features(cortex_ui PUBLIC cxx_std_17)
 if(EMSCRIPTEN)
   #target_compile_options(cortex_ui PRIVATE "SHELL: -s FETCH=1")
   # initial memory = 48 MiB
-  target_link_options(cortex_ui PRIVATE "SHELL: -sFETCH -sINITIAL_MEMORY=50331648")
+  target_link_options(cortex_ui PRIVATE "SHELL: -sFETCH -sINITIAL_MEMORY=${MEMORY_LIMIT}")
 endif()
 
 # For local testing and deployment to Github pages:

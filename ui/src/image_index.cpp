@@ -1,6 +1,6 @@
 #include "image_index.h"
 
-#include "transfer.h"
+#include "task.h"
 
 #include <json.hpp>
 
@@ -15,36 +15,36 @@ class image_index_impl final : public image_index
 {
   std::vector<image_info> image_info_;
 
-  std::unique_ptr<transfer> refresh_transfer_;
+  std::unique_ptr<task> refresh_task_;
 
 public:
   void loop() override
   {
-    if (!refresh_transfer_) {
+    if (!refresh_task_) {
       return;
     }
 
-    refresh_transfer_->poll();
+    refresh_task_->poll();
 
-    if (refresh_transfer_->done()) {
+    if (refresh_task_->done()) {
 
-      if (!refresh_transfer_->failed()) {
-        handle_refresh(static_cast<const char*>(refresh_transfer_->data()), refresh_transfer_->size());
+      if (!refresh_task_->failed()) {
+        handle_refresh(static_cast<const char*>(refresh_task_->data()), refresh_task_->size());
       }
 
-      refresh_transfer_.reset();
+      refresh_task_.reset();
     }
   }
 
-  [[nodiscard]] auto refreshing() const -> bool override { return !!refresh_transfer_; }
+  [[nodiscard]] auto refreshing() const -> bool override { return !!refresh_task_; }
 
   void refresh() override
   {
-    if (refresh_transfer_) {
+    if (refresh_task_) {
       return;
     }
 
-    refresh_transfer_ = transfer::get("/images.json");
+    refresh_task_ = task::http_get("/images.json");
   }
 
   auto get_image_info() -> std::vector<image_info>& override { return image_info_; }

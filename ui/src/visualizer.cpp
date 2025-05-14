@@ -88,9 +88,14 @@ public:
     glBindTexture(GL_TEXTURE_2D, bayer_texture_);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+#ifdef __EMSCRIPTEN__
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#else
     /* Note: This border behavior is important for accurate interpolation at the edges */
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+#endif
 
     glGenTextures(1, &color_attachment_);
     glBindTexture(GL_TEXTURE_2D, color_attachment_);
@@ -132,7 +137,7 @@ public:
         ImGui::EndTabItem();
       }
 
-      if (ImGui::BeginTabItem("Settings")) {
+      if (ImGui::BeginTabItem("Shader")) {
         loop_settings();
         ImGui::EndTabItem();
       }

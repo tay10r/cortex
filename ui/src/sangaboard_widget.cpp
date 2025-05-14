@@ -1,6 +1,6 @@
 #include "sangaboard_widget.h"
 
-#include "transfer.h"
+#include "task.h"
 
 #include <imgui.h>
 #include <imgui_stdlib.h>
@@ -24,7 +24,7 @@ class sangaboard_widget_impl final : public sangaboard_widget
 
   float illumination_{ 1.0F };
 
-  std::unique_ptr<transfer> command_transfer_;
+  std::unique_ptr<task> command_task_;
 
   bool failed_{ false };
 
@@ -43,7 +43,7 @@ public:
 
   void render() override
   {
-    const auto disabled{ !!command_transfer_ };
+    const auto disabled{ !!command_task_ };
 
     ImGui::InputText("IPv4", &server_ip_);
 
@@ -91,21 +91,21 @@ public:
 
   void poll() override
   {
-    if (!command_transfer_) {
+    if (!command_task_) {
       return;
     }
 
-    command_transfer_->poll();
+    command_task_->poll();
 
-    if (command_transfer_->done()) {
+    if (command_task_->done()) {
 
-      if (command_transfer_->failed()) {
+      if (command_task_->failed()) {
         failed_ = true;
       } else {
-        response_ = std::string(static_cast<const char*>(command_transfer_->data()), command_transfer_->size());
+        response_ = std::string(static_cast<const char*>(command_task_->data()), command_task_->size());
       }
 
-      command_transfer_.reset();
+      command_task_.reset();
     }
   }
 
@@ -125,7 +125,7 @@ protected:
     stream << ' ';
     stream << arg;
     stream << '\n';
-    command_transfer_ = transfer::post(get_url(), stream.str());
+    command_task_ = task::http_post(get_url(), stream.str());
     failed_ = false;
     response_.clear();
   }

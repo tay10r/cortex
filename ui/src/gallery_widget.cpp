@@ -1,6 +1,6 @@
 #include "gallery_widget.h"
 
-#include "transfer.h"
+#include "task.h"
 #include "visualizer.h"
 
 #include <imgui.h>
@@ -19,9 +19,9 @@ class gallery_widget_impl final : public gallery_widget
 
   std::unique_ptr<visualizer> visualizer_{ visualizer::create() };
 
-  std::unique_ptr<transfer> image_transfer_;
+  std::unique_ptr<task> image_task_;
 
-  std::unique_ptr<transfer> delete_transfer_;
+  std::unique_ptr<task> delete_task_;
 
   std::string error_;
 
@@ -53,7 +53,7 @@ public:
 
     const auto& imgs = image_index_->get_image_info();
     const auto has_selection{ selected_ < imgs.size() };
-    ImGui::BeginDisabled(!has_selection || !!delete_transfer_);
+    ImGui::BeginDisabled(!has_selection || !!delete_task_);
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1, 0, 0, 1));
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 1));
     if (ImGui::Button("Delete")) {
@@ -73,30 +73,30 @@ public:
 
   void poll() override
   {
-    if (image_transfer_) {
+    if (image_task_) {
 
-      image_transfer_->poll();
+      image_task_->poll();
 
-      if (image_transfer_->done()) {
+      if (image_task_->done()) {
 
-        if (image_transfer_->failed()) {
+        if (image_task_->failed()) {
           error_ = "Failed to fetch image data.";
         } else {
-          handle_image(image_transfer_->data(), image_transfer_->size());
+          handle_image(image_task_->data(), image_task_->size());
         }
 
-        image_transfer_.reset();
+        image_task_.reset();
       }
     }
 
-    if (delete_transfer_) {
-      delete_transfer_->poll();
-      if (delete_transfer_->done()) {
-        if (!delete_transfer_->failed()) {
+    if (delete_task_) {
+      delete_task_->poll();
+      if (delete_task_->done()) {
+        if (!delete_task_->failed()) {
           image_index_->refresh();
           selected_ = static_cast<size_t>(-1);
         }
-        delete_transfer_.reset();
+        delete_task_.reset();
       }
     }
   }
@@ -122,16 +122,16 @@ protected:
   {
     error_.clear();
 
-    if (image_transfer_ || !has_selection()) {
+    if (image_task_ || !has_selection()) {
       return;
     }
 
-    image_transfer_ = transfer::get("/images/" + image_index_->get_image_info().at(selected_).id + ".bin");
+    image_task_ = task::http_get("/images/" + image_index_->get_image_info().at(selected_).id + ".bin");
   }
 
   void delete_image()
   {
-    if (!has_selection() || !!delete_transfer_) {
+    if (!has_selection() || !!delete_task_) {
       return;
     }
 
@@ -139,7 +139,7 @@ protected:
 
     std::ostringstream url_stream;
     url_stream << "/images/" << imgs.at(selected_).id << ".bin";
-    delete_transfer_ = transfer::delete_(url_stream.str());
+    delete_task_ = task::http_delete(url_stream.str());
   }
 
   void render_image_selection_list()
@@ -152,7 +152,7 @@ protected:
 
     if (ImGui::BeginCombo("##Selected", preview)) {
 
-      ImGui::BeginDisabled(!!image_transfer_);
+      ImGui::BeginDisabled(!!image_task_);
 
       for (size_t i = 0; i < imgs.size(); i++) {
 
