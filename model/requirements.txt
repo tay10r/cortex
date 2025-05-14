@@ -4,3 +4,4 @@ tqdm
 loguru
 onnx
 kagglehub
+opencv-python

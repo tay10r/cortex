@@ -1,52 +1,49 @@
 from pathlib import Path
+from dataclasses import dataclass
 
+import numpy as np
 import torch
 from torch import Tensor
 from torch.utils.data import Dataset as DatasetBase
 from torchvision.transforms.v2 import functional as FT
 from torchvision.transforms import v2 as transforms
-from PIL import Image
-
-from scopenet.zstack import ZStack
+import cv2
 
 
-class _Transform(transforms.Transform):
-    def forward(self, x: Tensor, target: Tensor) -> Tensor:
-        return x, target
+@dataclass
+class _Sample:
+    x_path: Path
+    y_path: Path
+    x: Tensor | None = None
+    y: Tensor | None = None
 
 
 class Dataset(DatasetBase):
-    def __init__(self, root: str | Path, transform: transforms.Transform | None = _Transform()):
+    def __init__(self, root: str | Path, transform: transforms.Transform | None = None):
         if isinstance(root, str):
             root = Path(root)
-        self.__transform = transform
-        self.__stacks: list[ZStack] = []
-        self.__stack_length: None | int = None
-        for entry in root.glob('*'):
-            if entry.is_dir():
-                stack = ZStack(entry)
-                if self.__stack_length is None:
-                    self.__stack_length = len(stack)
-                elif self.__stack_length != len(stack):
-                    raise RuntimeError(
-                        f'Stack length established as {self.__stack_length} but encountered stack with a length of {len(stack)}')
-                self.__stacks.append(stack)
+        paths: list[Path] = []
+        for entry in root.glob('*.png'):
+            paths.append(entry)
+        paths.sort()
+        self.__samples: list[_Sample] = []
+        for i in range(len(paths) // 2):
+            self.__samples.append(_Sample(x_path=paths[i * 2 + 0],
+                                          y_path=paths[i * 2 + 1]))
 
     def __len__(self) -> tuple[int]:
-        if self.__stack_length is None:
-            return 0
-        return self.__stack_length * len(self.__stacks)
+        return len(self.__samples)
 
     def __getitem__(self, index) -> tuple[Tensor, Tensor]:
-        stack_index = index // self.__stack_length
-        slice_index = index % self.__stack_length
-        stack: ZStack = self.__stacks[stack_index]
-        img = Dataset.__image_to_tensor(stack[slice_index])
-        target = Dataset.__image_to_tensor(stack[stack.get_best_focus_index()])
-        if self.__transform is not None:
-            return self.__transform(img, target)
-        return img, target
+        s: _Sample = self.__samples[index]
+        if s.x is None:
+            s.x = Dataset.__image_to_tensor(
+                cv2.imread(s.x_path, cv2.IMREAD_UNCHANGED))
+        if s.y is None:
+            s.y = Dataset.__image_to_tensor(
+                cv2.imread(s.y_path, cv2.IMREAD_UNCHANGED))
+        return s.x, s.y
 
     @staticmethod
-    def __image_to_tensor(img: Image.Image) -> Tensor:
-        return FT.to_image(img) * (1.0 / 255.0)
+    def __image_to_tensor(img: np.ndarray) -> Tensor:
+        return FT.to_image(img) * (1.0 / 65535.0)
