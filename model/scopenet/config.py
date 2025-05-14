@@ -6,19 +6,44 @@ import kagglehub
 
 
 @dataclass
-class Config:
+class UserConfig:
     device: str = ''
     dataset_root: str = ''
-    batch_size: int = 16
     num_epochs: int = 100
+    use_tensorboard: bool = True
 
 
-def open_config(filename: str = 'config.json'):
+@dataclass
+class NetConfig:
+    batch_size: int = 16
+    lr: float = 0.002
+    lr_gamma: float = 1.0
+    weight_multiplier: int = 2
+    num_encoder_res_blocks: int = 0
+    num_decoder_res_blocks: int = 0
+    num_bottleneck_res_blocks: int = 4
+    final_activation: bool = False
+    se_enabled: bool = True
+    loss: str = 'l1'
+    adversarial: bool = True
+    optimizer: str = 'adam_w'
+
+
+def open_net_config(filename: str) -> NetConfig:
     p = Path(filename)
-    config = Config()
+    config = NetConfig()
     if p.exists():
         with open(p, 'r') as f:
-            config = Config(**json.load(f))
+            config = NetConfig(**json.load(f))
+    return config
+
+
+def open_user_config(filename: str = 'config/user.json'):
+    p = Path(filename)
+    config = UserConfig()
+    if p.exists():
+        with open(p, 'r') as f:
+            config = UserConfig(**json.load(f))
 
     # If no torch device specified, choose CUDA if available.
     if config.device == '':
