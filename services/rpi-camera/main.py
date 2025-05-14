@@ -27,6 +27,10 @@ picam2.start()
 # Warm up
 time.sleep(1)
 
+class CameraConfig(BaseModel):
+    exposure: float | None = None  # in microseconds
+    gain: float | None = None      # analog gain
+
 @app.get('/snapshot')
 async def capture_raw_bayer():
     frame = picam2.capture_array('raw')
