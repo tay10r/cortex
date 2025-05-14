@@ -5,11 +5,11 @@ from torch.nn import functional as F
 
 from loguru import logger
 
-from scopenet.config import open_config, Config
+from scopenet.config import open_user_config, open_net_config, UserConfig, NetConfig
 from scopenet.net import Net
 from scopenet.dataset import Dataset
 from scopenet.train import TrainingSession
-from scopenet.ssim import SSIMLoss
+from scopenet.loss import SSIMLoss
 
 from torch import Tensor, nn
 from torchvision.transforms import v2 as transforms
@@ -32,22 +32,24 @@ class _Transform(nn.Module):
 
 
 def main():
-    config: Config = open_config()
-    device = torch.device(config.device)
+    user_config: UserConfig = open_user_config()
+    net_config: NetConfig = open_net_config('config/net.json')
+    device = torch.device(user_config.device)
     logger.info(f'Torch Device: {device.type}:{device.index}')
-    train_data = Dataset(Path(config.dataset_root) /
+    train_data = Dataset(Path(user_config.dataset_root) /
                          'train', transform=_Transform(seed=0))
-    test_data = Dataset(Path(config.dataset_root) / 'test')
-    net = Net(in_channels=3)
+    test_data = Dataset(Path(user_config.dataset_root) / 'test')
+    preview_data = Dataset(Path(user_config.dataset_root) / 'preview')
+    net = Net(in_channels=3, config=net_config)
     net.to(device)
     session = TrainingSession(train_data,
                               test_data,
+                              preview_data,
                               device=device,
-                              model_name='scopenet',
-                              batch_size=config.batch_size)
-    loss_fn = SSIMLoss()
-    for i in range(100):
-        session.run_epoch(net, loss_fn)
+                              net=net,
+                              net_config=net_config,
+                              user_config=user_config)
+    session.run_epochs(num_epochs=100)
 
 
 if __name__ == '__main__':

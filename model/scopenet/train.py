@@ -1,123 +1,153 @@
-from typing import Callable
 import math
-from collections import deque
+from dataclasses import asdict
+
 import torch
-from torch import Tensor, nn, optim, concat
+from torch import Tensor, nn, optim, concat, unsqueeze
+from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset
-from torchvision.utils import make_grid, save_image
-from tqdm import tqdm
-from tqdm.notebook import tqdm as tqdm_nb
+from torch.optim.lr_scheduler import StepLR
+from torchvision.utils import make_grid
+
+from scopenet.observer import Observer
+from scopenet.config import UserConfig, NetConfig
+from scopenet.observers.tensorboard import TensorboardLogger
+from scopenet.loss import loss_functions, PatchDiscriminator
+from scopenet.optim import optimizers
 
 
 class TrainingSession:
+    """
+    This class is responsible for training the model, given a user-defined configuration.
+    The functionality can be extended by adding what are called "observers" to the training
+    session. Observers will be called under certain conditions, such as to report the test loss
+    or to report a preview of the model output.
+    """
+
     def __init__(self,
                  train_data: Dataset,
                  test_data: Dataset,
+                 preview_data: Dataset,
                  device: torch.device,
-                 model_name: str,
-                 model_version_major: int = 1,
-                 model_version_minor: int = 0,
-                 batch_size: int = 16,
-                 in_jupyter: bool = False,
-                 log_test_output: bool = True):
+                 net: nn.Module,
+                 net_config: NetConfig,
+                 user_config: UserConfig):
         self.__device = device
         self.__train_data = DataLoader(train_data,
-                                       batch_size=batch_size,
+                                       batch_size=net_config.batch_size,
                                        shuffle=True)
         self.__test_data = DataLoader(test_data,
-                                      batch_size=batch_size,
+                                      batch_size=net_config.batch_size,
                                       shuffle=False)
+        self.__preview_data = preview_data
         self.__epoch = 0
-        self.__optimizer: optim.Optimizer | None = None
+        self.__optimizer: optim.Optimizer = optimizers[net_config.optimizer](net.parameters(),
+                                                                             net_config.lr)
+        self.__lr_schedule = StepLR(self.__optimizer,
+                                    step_size=1,
+                                    gamma=net_config.lr_gamma)
         self.__best_loss = math.inf
-        self.__model_name = model_name
-        self.__model_version = f'v{model_version_major}.{model_version_minor}'
-        self.__in_jupyter = in_jupyter
-        self.__log_test_output = log_test_output
+        self.__net = net
+        self.__observers: list[Observer] = []
+        self.__loss = loss_functions[net_config.loss]
+        if net_config.adversarial:
+            self.__disc = PatchDiscriminator(in_channels=3).to(self.__device)
+            self.__disc_optim = optim.Adam(self.__disc.parameters(),
+                                           lr=net_config.lr * 0.25)
+        else:
+            self.__disc = None
+        if user_config.use_tensorboard:
+            hparams = asdict(net_config)
+            self.__observers.append(TensorboardLogger(hparams, ['loss/test']))
 
-    def run_epochs(self, net: nn.Module, loss_fn: Callable[[Tensor, Tensor], Tensor], num_epochs: int):
+    def add_observer(self, observer: Observer):
+        self.__observers.append(observer)
+
+    def run_epochs(self, num_epochs: int):
         for _ in range(num_epochs):
-            self.run_epoch(net, loss_fn)
+            self._run_epoch()
+        self._complete()
 
-    def run_epoch(self, net: nn.Module, loss_fn: Callable[[Tensor, Tensor], Tensor]):
-        if self.__optimizer is None:
-            self.__optimizer = optim.AdamW(net.parameters(), lr=0.0001)
-        self._run_train_epoch(net, loss_fn)
-        test_loss: float = self._run_test_epoch(net, loss_fn)
+    def _run_epoch(self):
+        self._run_train_epoch()
+        test_loss: float = self._run_test_epoch()
         if test_loss < self.__best_loss:
             self.__best_loss = test_loss
-            self._save_onnx(net)
+            for observer in self.__observers:
+                observer.on_model_update(self.__net, self.__epoch)
+        self._run_preview()
         self.__epoch += 1
 
-    def _save_onnx(self, net: nn.Module):
-        filename = f'{self.__model_name}-{self.__model_version}.onnx'
-        net.to('cpu')
-        x = torch.randn((1, 3, 2304, 2304))
-        torch.onnx.export(net,
-                          x,
-                          filename,
-                          input_names=['image'],
-                          output_names=['reconstructed'],
-                          dynamic_axes={
-                              'image': {0: 'batch_size', 2: 'width', 3: 'height'},
-                              'reconstructed': {0: 'batch_size', 2: 'width', 3: 'height'}
-                          },
-                          opset_version=11)
-        net.to(self.__device)
+    def _complete(self):
+        for observer in self.__observers:
+            observer.on_complete()
 
-    def _run_test_epoch(self, net: nn.Module, loss_fn: Callable[[Tensor, Tensor], Tensor]) -> float:
-        net.eval()
-        loss_list = deque(maxlen=1000)
+    def _run_preview(self):
+        results = torch.zeros((0, 3, 256, 256))
+        for x, _ in self.__preview_data:
+            results = concat((results, unsqueeze(x, dim=0)))
+        for x, _ in self.__preview_data:
+            y: Tensor = self.__net(unsqueeze(x, dim=0).to(self.__device))
+            results = concat((results, y.cpu()))
+        for _, target in self.__preview_data:
+            results = concat((results, unsqueeze(target, dim=0)))
+        g = make_grid(results, nrow=len(self.__preview_data))
+        for observer in self.__observers:
+            observer.on_preview(g, self.__epoch)
+
+    def _run_test_epoch(self) -> float:
+        self.__net.eval()
         loss_sum = 0.0
-        loader = None
-        if self.__in_jupyter:
-            loader = tqdm_nb(self.__test_data)
-        else:
-            loader = tqdm(self.__test_data)
-        k = 0
-        for sample in loader:
+        for sample in self.__test_data:
             x, target = sample
             x: Tensor = x.to(self.__device)
             target: Tensor = target.to(self.__device)
-            predicted: Tensor = net(x)
-            if self.__log_test_output:
-                self._log_output(x, predicted, target, k)
-            loss = loss_fn(predicted, target)
+            predicted: Tensor = self.__net(x)
+            loss: Tensor = self.__loss(predicted, target)
             loss_sum += loss.item()
-            loss_list.append(loss.item())
-            avg_loss = sum(loss_list) / len(loss_list)
-            loader.set_description(
-                f'Epoch [{self.__epoch}]:  Test Loss: {avg_loss:04}')
-            k += 1
-        loss_avg = loss_sum / len(loader)
+        loss_avg = loss_sum / len(self.__test_data)
+        for observer in self.__observers:
+            observer.on_scalar_metric('loss/test', loss_avg, self.__epoch)
         return loss_avg
 
-    def _log_output(self, input: Tensor, predicted: Tensor, target: Tensor, index: int):
-        if index != 4:
-            return
-        filename = f'{self.__epoch}_{index}.png'
-        batch_size = target.shape[0]
-        g = make_grid(concat((input, predicted, target), dim=0),
-                      nrow=batch_size)
-        save_image(g, filename)
-
-    def _run_train_epoch(self, net: nn.Module, loss_fn: Callable[[Tensor, Tensor], Tensor]):
-        net.train()
-        loss_list = deque(maxlen=1000)
-        if self.__in_jupyter:
-            loader = tqdm_nb(self.__train_data)
-        else:
-            loader = tqdm(self.__train_data)
-        for sample in loader:
+    def _run_train_epoch(self):
+        self.__net.train()
+        if self.__disc is not None:
+            self.__disc.train()
+        loss_sum = 0.0
+        for sample in self.__train_data:
             x, target = sample
             x: Tensor = x.to(self.__device)
             target: Tensor = target.to(self.__device)
-            predicted: Tensor = net(x)
-            loss = loss_fn(predicted, target)
-            loss_list.append(loss.item())
+            output: Tensor = self.__net(x)
+            loss: Tensor = self.__loss(output, target)
+
+            # if adversarial training is enabled,
+            # train discriminator and generator
+            if self.__disc is not None:
+                # train discriminator
+                pred_real = self.__disc(target)
+                pred_fake = self.__disc(output.detach())
+                loss_d = F.binary_cross_entropy_with_logits(pred_real,
+                                                            torch.ones_like(pred_real))
+                loss_d += F.binary_cross_entropy_with_logits(pred_fake,
+                                                             torch.zeros_like(pred_fake))
+                self.__disc_optim.zero_grad()
+                loss_d.backward()
+                self.__disc_optim.step()
+                # train generator
+                pred_fake = self.__disc(output)
+                adv_loss = F.binary_cross_entropy_with_logits(pred_fake,
+                                                              torch.ones_like(pred_fake))
+                loss += adv_loss * 0.01
+
+            loss_sum += loss.item()
             self.__optimizer.zero_grad()
             loss.backward()
             self.__optimizer.step()
-            avg_loss = sum(loss_list) / len(loss_list)
-            loader.set_description(
-                f'Epoch [{self.__epoch}]: Train Loss: {avg_loss:04}')
+        loss_avg = loss_sum / len(self.__train_data)
+        self.__lr_schedule.step()
+        for observer in self.__observers:
+            observer.on_scalar_metric('loss/train', loss_avg, self.__epoch)
+            observer.on_scalar_metric('lr',
+                                      self.__lr_schedule.get_last_lr()[0],
+                                      self.__epoch)
