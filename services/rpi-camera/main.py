@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from picamera2 import Picamera2
 import time
 import uvicorn
