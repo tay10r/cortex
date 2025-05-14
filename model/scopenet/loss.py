@@ -1,6 +1,6 @@
 import torch
+from torch import Tensor, nn
 import torch.nn.functional as F
-from torch import nn
 
 
 def gaussian_window(window_size: int, sigma: float, device):
@@ -18,7 +18,7 @@ class SSIMLoss(nn.Module):
         self.sigma = sigma
         self.size_average = size_average
 
-    def forward(self, img1, img2):
+    def forward(self, img1: Tensor, img2: Tensor):
         # Assume shape is (B, C, H, W)
         C = img1.size(1)
         window = gaussian_window(self.window_size, self.sigma, img1.device)
@@ -48,3 +48,40 @@ class SSIMLoss(nn.Module):
             return 1 - ssim_map.mean()
         else:
             return 1 - ssim_map.mean(dim=(1, 2, 3))
+
+
+class PatchDiscriminator(nn.Module):
+    def __init__(self, in_channels: int = 3):
+        super().__init__()
+
+        def conv_block(in_ch, out_ch, norm=True):
+            layers = [nn.Conv2d(in_ch, out_ch, 4, stride=2, padding=1)]
+            if norm:
+                layers.append(nn.BatchNorm2d(out_ch))
+            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            return nn.Sequential(*layers)
+
+        self.model = nn.Sequential(
+            conv_block(in_channels, 8, norm=False),
+            conv_block(8, 16),
+            conv_block(16, 32),
+            conv_block(32, 64),
+            nn.Conv2d(64, 1, 4, padding=1)  # Patch output
+        )
+
+    def forward(self, x: Tensor):
+        return self.model(x)
+
+
+def bce_loss(logits, target_is_real):
+    targets = torch.ones_like(
+        logits) if target_is_real else torch.zeros_like(logits)
+    return F.binary_cross_entropy_with_logits(logits, targets)
+
+
+loss_functions = {
+    'ssim': SSIMLoss(),
+    'l1': nn.L1Loss(),
+    'smooth_l1': nn.SmoothL1Loss(),
+    'mse': nn.MSELoss()
+}
