@@ -51,13 +51,6 @@ set(sources
   src/transfer.h
   src/image_index.h
   src/image_index.cpp
-  buffer.h
-  decoder.h
-  decoder.cpp
-  viewport.h
-  viewport.cpp
-  config.h
-  config.cpp
   tool.h
   tool.cpp
   tools/focus_tool.h
