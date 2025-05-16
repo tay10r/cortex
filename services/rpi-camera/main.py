@@ -1,10 +1,12 @@
 import time
 import struct
+import asyncio
 from fastapi import FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from picamera2 import Picamera2
 import uvicorn
+from pulse import PulseController
 
 X_RESOLUTION = 3280
 Y_RESOLUTION = 2464
@@ -22,25 +24,42 @@ app.add_middleware(
 
 # Initialize and configure camera
 picam2 = Picamera2()
-config = picam2.create_still_configuration(raw={'format': 'SRGGB10', 'size': (X_RESOLUTION, Y_RESOLUTION)})
+config = picam2.create_still_configuration(
+    raw={'format': 'SRGGB10', 'size': (X_RESOLUTION, Y_RESOLUTION)})
 picam2.configure(config)
 picam2.start()
+pulse = PulseController()
+
 
 class CameraConfig(BaseModel):
     exposure: int
     gain: float
 
+
 @app.get('/snapshot')
 async def capture_raw_bayer():
-    frame = picam2.capture_array('raw')
+
+    # Begin frame acquisition.
+    future = picam2.capture_array_async('raw')
+
+    # Wait for the exposure to start.
+    await asyncio.sleep(0.05)
+
+    timestamps = pulse.pulse(duration_us=1000)
+    # TODO : send back actual pulse width range
+
+    frame = await future
+
     raw_bytes = frame.tobytes()
 
     headers = {
-        'X-Image-Width': str(frame.shape[1] // 2),  # 16-bit Bayer, width halved
+        # 16-bit Bayer, width halved
+        'X-Image-Width': str(frame.shape[1] // 2),
         'X-Image-Height': str(frame.shape[0])
     }
 
     return Response(content=raw_bytes, media_type='application/octet-stream', headers=headers)
+
 
 @app.get('/config')
 async def get_config():
@@ -50,13 +69,15 @@ async def get_config():
     packed = struct.pack('<If', exposure, gain)
     return Response(content=packed, media_type='application/octet-stream')
 
+
 @app.put('/config')
 async def set_config(request: Request):
     try:
         body = await request.body()
 
         if len(body) != 8:
-            raise ValueError("Expected 8 bytes: 4 for gain (float32), 4 for exposure (uint32)")
+            raise ValueError(
+                "Expected 8 bytes: 4 for gain (float32), 4 for exposure (uint32)")
 
         # Unpack LE binary: float32 gain, uint32 exposure
         exposure, gain = struct.unpack('<If', body)
@@ -72,4 +93,4 @@ async def set_config(request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 if __name__ == '__main__':
-    uvicorn.run('your_filename:app', host='0.0.0.0', port=6500)
+    uvicorn.run('main:app', host='0.0.0.0', port=6500)
