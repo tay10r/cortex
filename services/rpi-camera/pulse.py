@@ -6,7 +6,7 @@ class PulseController:
         self.__device = serial.Serial(port, baudrate, timeout=1)
 
     def read_response(self) -> list[str]:
-        result = ''
+        result: list[str] = []
         while True:
             line = self.__device.readline()
             if line == b'':
@@ -26,12 +26,12 @@ class PulseController:
         self.__device.flush()
 
     def on(self):
-        self.__device.write('on'.encode())
-        self.__flush()
+        self.__device.write('on\n'.encode())
+        self.__device.flush()
 
     def off(self):
-        self.__device.write('off'.encode())
-        self.__flush()
+        self.__device.write('off\n'.encode())
+        self.__device.flush()
 
     def pulse(self, delay: int = 0, duration_us: int = 50):
         cmd = f"pulse {delay} {duration_us}\n"
@@ -50,6 +50,8 @@ if __name__ == '__main__':
     # test program
     import time
     controller = PulseController()
-    controller.pulse(duration_us=1000)
-    response = controller.read_pulse_response()
+    #controller.pulse(duration_us=1000)
+    #response = controller.read_pulse_response()
+    controller.pwm(127)
+    response = controller.read_response()
     print(response)
