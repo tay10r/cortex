@@ -10,6 +10,13 @@ ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=TIMEOUT)
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_methods=['*'],
+    allow_headers=['*']
+)
+
 @app.post('/command', response_class=Response, status_code=200)
 async def send_command(request: Request):
     # Read raw body as bytes, decode to str
