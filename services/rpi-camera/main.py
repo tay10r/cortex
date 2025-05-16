@@ -37,15 +37,16 @@ class CameraConfig(BaseModel):
 
 
 @app.get('/snapshot')
-async def capture_raw_bayer():
+async def capture_raw_bayer(pulse_delay: int = 50000, pulse_duration: int = 1000):
 
     # Begin frame acquisition.
     future = picam2.capture_array_async('raw')
 
     # Wait for the exposure to start.
-    await asyncio.sleep(0.05)
+    # TODO : maybe put this into the embedded software.
+    await asyncio.sleep(pulse_delay / 1000000.0)
 
-    timestamps = pulse.pulse(duration_us=1000)
+    timestamps = pulse.pulse(duration_us=pulse_duration)
     # TODO : send back actual pulse width range
 
     frame = await future

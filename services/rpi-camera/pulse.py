@@ -26,6 +26,5 @@ if __name__ == '__main__':
     # test program
     import time
     controller = PulseController()
-    time.sleep(2)  # Allow board to reset
-    response = controller.pulse(duration_us=1)
+    response = controller.pulse(duration_us=1000)
     print(response)
