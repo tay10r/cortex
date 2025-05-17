@@ -16,6 +16,12 @@ class sangaboard_widget_impl final : public sangaboard_widget
 {
   std::string server_ip_{ "127.0.0.1" };
 
+  int dx_{};
+
+  int dy_{};
+
+  int dz_{};
+
   int x_{};
 
   int y_{};
@@ -47,30 +53,32 @@ public:
 
     ImGui::InputText("IPv4", &server_ip_);
 
-    ImGui::DragInt("##Move X", &x_);
+    ImGui::Text("Relative Offset: %d %d %d", x_, y_, z_);
+
+    ImGui::DragInt("##Move X", &dx_);
     ImGui::SameLine();
     ImGui::BeginDisabled(disabled);
     if (ImGui::Button("Move X")) {
-      send_command("mrx", x_);
-      x_ = 0;
+      send_command("mrx", dx_);
+      x_ += dx_;
     }
     ImGui::EndDisabled();
 
-    ImGui::DragInt("##Move Y", &y_);
+    ImGui::DragInt("##Move Y", &dy_);
     ImGui::SameLine();
     ImGui::BeginDisabled(disabled);
     if (ImGui::Button("Move Y")) {
-      send_command("mry", y_);
-      y_ = 0;
+      send_command("mry", dy_);
+      y_ += dy_;
     }
     ImGui::EndDisabled();
 
-    ImGui::DragInt("##Move Z", &z_);
+    ImGui::DragInt("##Move Z", &dz_);
     ImGui::SameLine();
     ImGui::BeginDisabled(disabled);
     if (ImGui::Button("Move Z")) {
-      send_command("mrz", z_);
-      z_ = 0;
+      send_command("mrz", dz_);
+      z_ += dz_;
     }
     ImGui::EndDisabled();
 
