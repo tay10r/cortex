@@ -40,6 +40,7 @@ class CameraConfig(BaseModel):
 async def capture_raw_bayer(light_duty_cycle: int = 127):
 
     pulse.pwm(light_duty_cycle)
+    pulse.discard_response()
 
     # Capture and discard a frame to ensure the frame
     # that we do get has been fully saturated at the
@@ -50,6 +51,7 @@ async def capture_raw_bayer(light_duty_cycle: int = 127):
     frame = picam2.capture_array('raw')
 
     pulse.off()
+    pulse.discard_response()
 
     raw_bytes = frame.tobytes()
 
