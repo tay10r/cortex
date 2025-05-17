@@ -36,6 +36,8 @@ class camera_widget_impl final : public camera_widget
 
   float gain_{ 1 };
 
+  int light_level_{ 127 };
+
 public:
   void setup() override
   {
@@ -78,6 +80,8 @@ public:
     }
 
     if (ImGui::CollapsingHeader("Controls")) {
+
+      ImGui::SliderInt("Light Duty Cycle", &light_level_, 0, 255);
 
       ImGui::SliderInt("Exposure [microseconds]", &exposure_, 0, 1'000'000, nullptr);
 
@@ -205,7 +209,8 @@ protected:
       return;
     }
 
-    std::string url{ std::string("http://") + camera_server_ + ":6500/snapshot" };
+    const std::string url{ std::string("http://") + camera_server_ +
+                           ":6500/snapshot?light_duty_cycle=" + std::to_string(light_level_) };
 
     frame_task_ = task::http_get(url);
 

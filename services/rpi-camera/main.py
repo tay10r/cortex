@@ -37,14 +37,19 @@ class CameraConfig(BaseModel):
 
 
 @app.get('/snapshot')
-async def capture_raw_bayer(pulse_delay: int = 50000, pulse_duration: int = 1000):
+async def capture_raw_bayer(light_duty_cycle: int = 127):
 
-    pulse.pulse(duration_us=pulse_duration)
+    pulse.pwm(light_duty_cycle)
 
+    # Capture and discard a frame to ensure the frame
+    # that we do get has been fully saturated at the
+    # LED duty cycle we set.
+    picam2.capture_array('raw')
+
+    # This is the frame we keep.
     frame = picam2.capture_array('raw')
 
-    # TODO : send back actual pulse width range
-    timestamps = pulse.read_pulse_response()
+    pulse.off()
 
     raw_bytes = frame.tobytes()
 
