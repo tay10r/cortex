@@ -1,5 +1,6 @@
 #include "program.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -30,19 +31,46 @@ program::reset()
 }
 
 auto
-program::parse_pulse_duration(int* duration) const -> bool
+program::parse_pwm(int* duty_cycle) const -> bool
 {
-  if (line_size_ == 0) {
+  constexpr size_t k{ sizeof("pwm") - 1 };
+
+  if (line_size_ < k) {
     return false;
   }
 
-  const auto first = line_buffer_[0];
-  if ((first >= '0') && (first <= '9')) {
-    *duration = atoi(line_buffer_);
-    return true;
-  } else {
+  if (memcmp(line_buffer_, "pwm", k) != 0) {
     return false;
   }
+
+  const char* args{ line_buffer_ + k };
+
+  if (sscanf(args, "%d", duty_cycle) != 1) {
+    return false;
+  }
+  return (*duty_cycle >= 0) && (*duty_cycle <= 255);
+}
+
+auto
+program::parse_pulse(unsigned int* delay, unsigned int* duration) const -> bool
+{
+  constexpr size_t k{ sizeof("pulse") - 1 };
+
+  if (line_size_ < k) {
+    return false;
+  }
+
+  if (memcmp(line_buffer_, "pulse", k) != 0) {
+    return false;
+  }
+
+  const char* args{ line_buffer_ + k };
+
+  if (memchr(line_buffer_, '-', line_size_) != nullptr) {
+    return false;
+  }
+
+  return sscanf(args, "%u %u", delay, duration) == 2;
 }
 
 auto

@@ -1,6 +1,5 @@
 #include <stddef.h>
 
-[[nodiscard]]
 constexpr auto
 max_line_size() -> size_t
 {
@@ -14,15 +13,17 @@ class program final
   size_t line_size_{};
 
 public:
-  [[nodiscard]] auto put(char c) -> bool;
+  auto put(char c) -> bool;
 
   void reset();
 
-  [[nodiscard]] auto parse_pulse_duration(int* duration) const -> bool;
+  auto parse_pulse(unsigned int* delay, unsigned int* duration) const -> bool;
 
-  [[nodiscard]] auto parse_on() const -> bool;
+  auto parse_pwm(int* duty_cycle) const -> bool;
 
-  [[nodiscard]] auto parse_off() const -> bool;
+  auto parse_on() const -> bool;
 
-  [[nodiscard]] auto parse_help() const -> bool;
+  auto parse_off() const -> bool;
+
+  auto parse_help() const -> bool;
 };
