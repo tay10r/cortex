@@ -17,6 +17,8 @@ public:
 
   virtual void release(void* addr, size_t s) = 0;
 
+  [[nodiscard]] virtual auto used() const -> size_t = 0;
+
   [[nodiscard]] virtual auto remaining() const -> size_t = 0;
 
   [[nodiscard]] virtual auto total() const -> size_t = 0;

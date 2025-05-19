@@ -28,6 +28,8 @@ public:
     free(addr);
   }
 
+  auto used() const -> size_t override { return used_; }
+
   auto remaining() const -> size_t override { return (used_ < total_) ? total_ - used_ : 0; }
 
   auto total() const -> size_t override { return total_; }

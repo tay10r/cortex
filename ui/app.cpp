@@ -6,6 +6,7 @@
 #include "src/gallery_widget.h"
 #include "src/image_index.h"
 #include "src/sangaboard_widget.h"
+#include "src/tools_widget.h"
 
 #include <map>
 #include <string>
@@ -25,6 +26,8 @@ class app final : public uikit::app
   std::map<std::string, std::unique_ptr<sangaboard_widget>> sangaboard_widgets_;
 
   std::map<std::string, std::unique_ptr<gallery_widget>> gallery_widgets_;
+
+  std::unique_ptr<tools_widget> tools_widget_;
 
 public:
   void setup(uikit::platform& plt) override
@@ -63,9 +66,37 @@ public:
     update_widgets(camera_widgets_);
 
     update_widgets(gallery_widgets_);
+
+    update_widget("Tools", tools_widget_, ImVec2(256, 512));
   }
 
 protected:
+  template<typename T>
+  void update_widget(const char* label, std::unique_ptr<T>& widget_ptr, const ImVec2& initial_size)
+  {
+    if (!widget_ptr) {
+      return;
+    }
+
+    auto* w = static_cast<widget*>(widget_ptr.get());
+
+    w->poll();
+
+    bool open{ true };
+
+    ImGui::SetNextWindowSize(initial_size, ImGuiCond_Appearing);
+
+    if (ImGui::Begin(label, &open)) {
+      w->render();
+    }
+    ImGui::End();
+
+    if (!open) {
+      w->teardown();
+      widget_ptr.reset();
+    }
+  }
+
   template<typename T>
   static void update_widgets(std::map<std::string, std::unique_ptr<T>>& widgets)
   {
@@ -105,7 +136,7 @@ protected:
     if (ImGui::BeginMenu("Widgets")) {
 
       if (ImGui::MenuItem("New Camera Widget")) {
-        auto widget = camera_widget::create();
+        auto widget = camera_widget::create(this, on_plot);
         widget->setup();
         camera_widgets_.emplace("Camera ##" + std::to_string(generate_id()), std::move(widget));
       }
@@ -117,9 +148,15 @@ protected:
       }
 
       if (ImGui::MenuItem("New Gallery Widget")) {
-        auto widget = gallery_widget::create(image_index_);
+        auto widget = gallery_widget::create(this, on_plot, image_index_);
         widget->setup();
         gallery_widgets_.emplace("Gallery ##" + std::to_string(generate_id()), std::move(widget));
+      }
+
+      if (ImGui::MenuItem("New Tools Widget")) {
+        auto widget = tools_widget::create();
+        widget->setup();
+        tools_widget_ = std::move(widget);
       }
 
       ImGui::EndMenu();
@@ -127,6 +164,15 @@ protected:
   }
 
   [[nodiscard]] auto generate_id() -> size_t { return next_id_++; }
+
+  static void on_plot(void* self_ptr, const image& img)
+  {
+    auto* self = static_cast<app*>(self_ptr);
+
+    if (self->tools_widget_) {
+      self->tools_widget_->plot(img);
+    }
+  }
 };
 
 } // namespace

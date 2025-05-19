@@ -21,9 +21,20 @@ uniform highp vec2 texture_size;
 /* Size of one texel (ex. 1.0/3280.0, 1.0/2464.0) */
 uniform highp vec2 texel_size;
 
+/* The weight of each color value. */
+uniform highp vec3 color_balance;
+
+/* The digital gain to apply to all color channels. */
+uniform highp float gain;
+
+/* Gamma correction exponent. */
+uniform highp float gamma;
+
 highp vec3
 filter_rgb(highp vec3 rgb)
 {
+  rgb = rgb * color_balance * gain;
+  rgb = pow(rgb, vec3(1.0 / gamma));
   return rgb;
 }
 

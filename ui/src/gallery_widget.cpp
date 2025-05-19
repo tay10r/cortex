@@ -17,7 +17,7 @@ class gallery_widget_impl final : public gallery_widget
 
   size_t selected_{ static_cast<size_t>(-1) };
 
-  std::unique_ptr<visualizer> visualizer_{ visualizer::create() };
+  std::unique_ptr<visualizer> visualizer_;
 
   std::unique_ptr<task> image_task_;
 
@@ -26,8 +26,9 @@ class gallery_widget_impl final : public gallery_widget
   std::string error_;
 
 public:
-  explicit gallery_widget_impl(std::shared_ptr<image_index> img_index)
+  explicit gallery_widget_impl(void* parent, plot_callback plot_cb, std::shared_ptr<image_index> img_index)
     : image_index_(std::move(img_index))
+    , visualizer_(visualizer::create(parent, plot_cb))
   {
   }
 
@@ -176,9 +177,10 @@ protected:
 } // namespace
 
 auto
-gallery_widget::create(std::shared_ptr<image_index> img_index) -> std::unique_ptr<gallery_widget>
+gallery_widget::create(void* parent, plot_callback plot_cb, std::shared_ptr<image_index> img_index)
+  -> std::unique_ptr<gallery_widget>
 {
-  return std::make_unique<gallery_widget_impl>(std::move(img_index));
+  return std::make_unique<gallery_widget_impl>(parent, plot_cb, std::move(img_index));
 }
 
 } // namespace cortex

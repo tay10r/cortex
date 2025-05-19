@@ -1,5 +1,7 @@
 #pragma once
 
+#include "plot.h"
+
 #include <memory>
 
 namespace cortex {
@@ -11,7 +13,7 @@ namespace cortex {
 class visualizer
 {
 public:
-  static auto create() -> std::unique_ptr<visualizer>;
+  static auto create(void* parent, plot_callback plot_cb) -> std::unique_ptr<visualizer>;
 
   virtual ~visualizer() = default;
 

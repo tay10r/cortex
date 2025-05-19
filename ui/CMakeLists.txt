@@ -12,15 +12,12 @@ endif()
 if(NOT DEFINED MEMORY_LIMIT)
   # This is the memory limit for the app as a whole,
   # which includes the stack size, heap size (including all untracked allocations).
-  # 64 MiB
-  set(MEMORY_LIMIT 67108864)
-endif()
-
-if(NOT DEFINED SOFT_MEMORY_LIMIT)
-  # This is the memory limit for large objects (such as images)
-  # that are tracked by the app.
-  # 48 MiB
-  set(SOFT_MEMORY_LIMIT 50331648)
+  # There should be some memory for different types of small objects, and memory specifically for:
+  #  - a download of a 3280x2464 16 bpp image from the camera
+  #  - a download of a 3280x2464 16 bpp image from the gallery
+  #  - a few working copies of an image
+  # 128 MiB
+  set(MEMORY_LIMIT 134217728)
 endif()
 
 if(POLICY CMP0135)
@@ -63,7 +60,11 @@ cmrc_add_resource_library(shaders
 add_library(cortex
   src/memory.h
   src/memory.cpp
+  src/image.h
+  src/image.cpp
   src/task.h
+  src/white_balance.h
+  src/white_balance.cpp
 )
 
 if(EMSCRIPTEN)
@@ -87,6 +88,7 @@ endif()
 
 set(sources
   app.cpp
+  src/plot.h
   src/widget.h
   src/camera_widget.h
   src/camera_widget.cpp
@@ -98,10 +100,12 @@ set(sources
   src/visualizer.cpp
   src/image_index.h
   src/image_index.cpp
-  tool.h
-  tool.cpp
-  tools/focus_tool.h
-  tools/focus_tool.cpp
+  src/tools_widget.h
+  src/tools_widget.cpp
+  src/tool.h
+  src/tool.cpp
+  src/white_balance_tool.h
+  src/white_balance_tool.cpp
   ${texteditor_SOURCE_DIR}/TextEditor.h
   ${texteditor_SOURCE_DIR}/TextEditor.cpp
 )

@@ -1,5 +1,7 @@
 #include "visualizer.h"
 
+#include "image.h"
+
 #include <uikit/shader_compiler.hpp>
 
 #include <GLES2/gl2.h>
@@ -26,41 +28,57 @@ get_shader(const std::string& path) -> std::string
   return std::string(file.begin(), file.size());
 }
 
+struct uniform_map final
+{
+  GLint bayer_data_location{};
+
+  GLint texture_size_location{};
+
+  GLint texel_size_location{};
+
+  GLint color_balance_location{};
+
+  GLint gain_location{};
+
+  GLint gamma_location{};
+};
+
 class shader final
 {
   GLuint id_{};
 
   GLint position_location_{};
 
-  GLint bayer_data_location_{};
-
-  GLint texture_size_location_{};
-
-  GLint texel_size_location_{};
+  uniform_map uniforms_;
 
 public:
   explicit shader(const std::string& frag_src)
     : id_(uikit::compile_shader(get_shader("/shaders/debayer.vert").c_str(), frag_src.c_str(), {}))
   {
     position_location_ = glGetAttribLocation(id_, "a_position");
-    bayer_data_location_ = glGetUniformLocation(id_, "bayer_data");
-    texture_size_location_ = glGetUniformLocation(id_, "texture_size");
-    texel_size_location_ = glGetUniformLocation(id_, "texel_size");
+
+    auto& u = uniforms_;
+    u.bayer_data_location = glGetUniformLocation(id_, "bayer_data");
+    u.texture_size_location = glGetUniformLocation(id_, "texture_size");
+    u.texel_size_location = glGetUniformLocation(id_, "texel_size");
+    u.color_balance_location = glGetUniformLocation(id_, "color_balance");
+    u.gain_location = glGetUniformLocation(id_, "gain");
+    u.gamma_location = glGetUniformLocation(id_, "gamma");
   }
 
   void use() { glUseProgram(id_); }
 
   [[nodiscard]] auto get_position_location() const -> GLint { return position_location_; }
 
-  [[nodiscard]] auto get_bayer_data_location() const -> GLint { return bayer_data_location_; }
-
-  [[nodiscard]] auto get_texture_size_location() const -> GLint { return texture_size_location_; }
-
-  [[nodiscard]] auto get_texel_size_location() const -> GLint { return texel_size_location_; }
+  [[nodiscard]] auto get_uniforms() const -> const uniform_map* { return &uniforms_; }
 };
 
 class visualizer_impl final : public visualizer
 {
+  void* parent_{};
+
+  plot_callback plot_cb_{};
+
   GLuint vertex_buffer_{};
 
   GLuint bayer_texture_{};
@@ -75,11 +93,25 @@ class visualizer_impl final : public visualizer
 
   std::string compile_error_;
 
+  float balance_[3]{ 1.0F, 0.5F, 1.0F };
+
+  float gain_{ 1.0F };
+
+  float gamma_{ 2.2F };
+
   int width_{};
 
   int height_{};
 
+  image image_;
+
 public:
+  visualizer_impl(void* parent, plot_callback plot_cb)
+    : parent_(parent)
+    , plot_cb_(plot_cb)
+  {
+  }
+
   void setup() override
   {
     glGenBuffers(1, &vertex_buffer_);
@@ -148,6 +180,8 @@ public:
 
   void update(const void* bayer_data, const int w, const int h) override
   {
+    image_ = image(static_cast<const uint16_t*>(bayer_data), w, h);
+
     setup_image_buffers(w, h);
 
     glActiveTexture(GL_TEXTURE0);
@@ -171,11 +205,13 @@ protected:
 
     shader_->use();
 
-    glUniform2f(shader_->get_texture_size_location(), static_cast<float>(w), static_cast<float>(h));
-    glUniform2f(shader_->get_texel_size_location(), 1.0F / static_cast<float>(w), 1.0F / static_cast<float>(h));
-
-    // point texture uniform to GL_TEXTURE0 (we probably don't need to, but should for correctness)
-    glUniform1i(shader_->get_bayer_data_location(), 0);
+    const auto* u = shader_->get_uniforms();
+    glUniform2f(u->texture_size_location, static_cast<float>(w), static_cast<float>(h));
+    glUniform2f(u->texel_size_location, 1.0F / static_cast<float>(w), 1.0F / static_cast<float>(h));
+    glUniform3f(u->color_balance_location, balance_[0], balance_[1], balance_[2]);
+    glUniform1f(u->gain_location, gain_);
+    glUniform1f(u->gamma_location, gamma_);
+    glUniform1i(u->bayer_data_location, 0);
 
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_);
 
@@ -196,12 +232,28 @@ protected:
 
   void loop_viewport()
   {
+    if (ImGui::InputFloat3("Color Balance", balance_)) {
+      render_frame();
+    }
+
+    if (ImGui::DragFloat("Digital Gain", &gain_, /*v_speed=*/0.02F, /*v_min=*/1.0F, /*v_max=*/10.0F)) {
+      render_frame();
+    }
+
+    if (ImGui::DragFloat("Gamma", &gamma_, /*v_speed=*/0.01F, /*v_min=*/0.1F, /*v_max=*/10.0F)) {
+      render_frame();
+    }
+
     if (!ImPlot::BeginPlot("##Viewport", ImVec2(-1, -1), ImPlotFlags_Equal | ImPlotFlags_CanvasOnly)) {
       return;
     }
 
     ImPlot::PlotImage(
       "##Image", reinterpret_cast<ImTextureID>(color_attachment_), ImPlotPoint(0, 0), ImPlotPoint(width_, height_));
+
+    if (plot_cb_) {
+      plot_cb_(parent_, image_);
+    }
 
     ImPlot::EndPlot();
   }
@@ -274,9 +326,9 @@ protected:
 } // namespace
 
 auto
-visualizer::create() -> std::unique_ptr<visualizer>
+visualizer::create(void* parent, plot_callback plot_cb) -> std::unique_ptr<visualizer>
 {
-  return std::make_unique<visualizer_impl>();
+  return std::make_unique<visualizer_impl>(parent, plot_cb);
 }
 
 } // namespace cortex

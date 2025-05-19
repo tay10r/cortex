@@ -22,7 +22,7 @@ class camera_widget_impl final : public camera_widget
 {
   std::string camera_server_{ "127.0.0.1" };
 
-  std::unique_ptr<visualizer> visualizer_{ visualizer::create() };
+  std::unique_ptr<visualizer> visualizer_;
 
   std::unique_ptr<task> frame_task_;
 
@@ -39,6 +39,11 @@ class camera_widget_impl final : public camera_widget
   int light_level_{ 127 };
 
 public:
+  camera_widget_impl(void* parent, plot_callback plot_cb)
+    : visualizer_(visualizer::create(parent, plot_cb))
+  {
+  }
+
   void setup() override
   {
     visualizer_->setup();
@@ -79,13 +84,13 @@ public:
       ImGui::PopStyleColor();
     }
 
-    if (ImGui::CollapsingHeader("Controls")) {
+    if (ImGui::CollapsingHeader("Camera Controls")) {
 
       ImGui::SliderInt("Light Duty Cycle", &light_level_, 0, 255);
 
       ImGui::SliderInt("Exposure [microseconds]", &exposure_, 0, 1'000'000, nullptr);
 
-      ImGui::SliderFloat("Gain", &gain_, 1, 8);
+      ImGui::SliderFloat("Analog Gain", &gain_, 1, 8);
 
       ImGui::BeginDisabled(!!config_get_task_);
 
@@ -170,7 +175,7 @@ protected:
 
     if (config_set_task_->done()) {
 
-      if (!config_set_task_->failed()) {
+      if (config_set_task_->failed()) {
         errored_ = "failed to set config";
       }
 
@@ -235,9 +240,9 @@ protected:
 } // namespace
 
 auto
-camera_widget::create() -> std::unique_ptr<camera_widget>
+camera_widget::create(void* parent, plot_callback plot_cb) -> std::unique_ptr<camera_widget>
 {
-  return std::make_unique<camera_widget_impl>();
+  return std::make_unique<camera_widget_impl>(parent, plot_cb);
 }
 
 } // namespace cortex
