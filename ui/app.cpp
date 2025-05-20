@@ -135,18 +135,6 @@ protected:
   {
     if (ImGui::BeginMenu("Widgets")) {
 
-      if (ImGui::MenuItem("New Camera Widget")) {
-        auto widget = camera_widget::create(this, on_plot);
-        widget->setup();
-        camera_widgets_.emplace("Camera ##" + std::to_string(generate_id()), std::move(widget));
-      }
-
-      if (ImGui::MenuItem("New Sangaboard Widget")) {
-        auto widget = sangaboard_widget::create();
-        widget->setup();
-        sangaboard_widgets_.emplace("Sangaboard ##" + std::to_string(generate_id()), std::move(widget));
-      }
-
       if (ImGui::MenuItem("New Gallery Widget")) {
         auto widget = gallery_widget::create(this, on_plot, image_index_);
         widget->setup();
@@ -157,6 +145,20 @@ protected:
         auto widget = tools_widget::create();
         widget->setup();
         tools_widget_ = std::move(widget);
+      }
+
+      ImGui::SeparatorText("Connect to Hardware");
+
+      if (ImGui::MenuItem("New Camera Widget")) {
+        auto widget = camera_widget::create(this, on_plot);
+        widget->setup();
+        camera_widgets_.emplace("Camera ##" + std::to_string(generate_id()), std::move(widget));
+      }
+
+      if (ImGui::MenuItem("New Sangaboard Widget")) {
+        auto widget = sangaboard_widget::create();
+        widget->setup();
+        sangaboard_widgets_.emplace("Sangaboard ##" + std::to_string(generate_id()), std::move(widget));
       }
 
       ImGui::EndMenu();

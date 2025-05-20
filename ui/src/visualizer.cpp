@@ -93,7 +93,7 @@ class visualizer_impl final : public visualizer
 
   std::string compile_error_;
 
-  float balance_[3]{ 1.0F, 0.5F, 1.0F };
+  float balance_[3]{ 0.7F, 1.0F, 2.0F };
 
   float gain_{ 1.0F };
 

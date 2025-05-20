@@ -45,6 +45,8 @@ public:
 
     ImGui::Separator();
 
+    ImGui::SeparatorText("Tool Properties");
+
     auto* t = get_selected();
     if (t) {
       t->render_ui();
