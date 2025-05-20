@@ -25,7 +25,7 @@ app.add_middleware(
 # Initialize and configure camera
 picam2 = Picamera2()
 config = picam2.create_still_configuration(
-    raw={'format': 'SRGGB10', 'size': (X_RESOLUTION, Y_RESOLUTION)})
+    raw={'format': 'SGRBG10', 'size': (X_RESOLUTION, Y_RESOLUTION)})
 picam2.configure(config)
 picam2.start()
 pulse = PulseController()
