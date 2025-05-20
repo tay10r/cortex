@@ -49,20 +49,20 @@ make_image_response() -> response
 
     switch (j) {
       case 0:
+        // green
+        color = g;
+        break;
+      case 1:
+        // blue
+        color = b;
+        break;
+      case 2:
         // red
         color = r;
         break;
-      case 1:
-        // green
-        color = g;
-        break;
-      case 2:
-        // green
-        color = g;
-        break;
       case 3:
-        // blue
-        color = b;
+        // green 2
+        color = g;
         break;
     }
 
@@ -202,7 +202,9 @@ protected:
 };
 
 class threaded_task : public task
-{};
+{
+public:
+};
 
 } // namespace
 

@@ -113,25 +113,25 @@ fetch_rgb(highp vec2 uv)
      * */
 
     if (idx < 0.5) {
-        /* Red */
-        r = fetch_bayer_pixel(x, y);
-        g = 0.25 * (fetch_bayer_pixel(x - dx, y) + fetch_bayer_pixel(x + dx, y) + fetch_bayer_pixel(x, y - dy) + fetch_bayer_pixel(x, y + dy));
-        b = 0.25 * (fetch_bayer_pixel(x - dx, y - dy) + fetch_bayer_pixel(x + dx, y - dy) + fetch_bayer_pixel(x - dx, y + dy) + fetch_bayer_pixel(x + dx, y + dy));
-    } else if (idx < 1.5) {
-        /* Green (on blue row) */
-        g = fetch_bayer_pixel(x, y);
-        b = 0.5 * (fetch_bayer_pixel(x, y - dy) + fetch_bayer_pixel(x, y + dy));
-        r = 0.5 * (fetch_bayer_pixel(x - dx, y) + fetch_bayer_pixel(x + dx, y));
-    } else if (idx < 2.5) {
-        /* Green (on red row) */
+        /* Green */
         g = fetch_bayer_pixel(x, y);
         b = 0.5 * (fetch_bayer_pixel(x - dx, y) + fetch_bayer_pixel(x + dx, y));
         r = 0.5 * (fetch_bayer_pixel(x, y - dy) + fetch_bayer_pixel(x, y + dy));
-    } else if (idx < 3.5) {
+    } else if (idx < 1.5) {
         /* Blue */
         b = fetch_bayer_pixel(x, y);
         g = 0.25 * (fetch_bayer_pixel(x - dx, y) + fetch_bayer_pixel(x + dx, y) + fetch_bayer_pixel(x, y - dy) + fetch_bayer_pixel(x, y + dy));
         r = 0.25 * (fetch_bayer_pixel(x - dx, y - dy) + fetch_bayer_pixel(x + dx, y - dy) + fetch_bayer_pixel(x - dx, y + dy) + fetch_bayer_pixel(x + dx, y + dy));
+    } else if (idx < 2.5) {
+        /* Red */
+        r = fetch_bayer_pixel(x, y);
+        g = 0.25 * (fetch_bayer_pixel(x - dx, y) + fetch_bayer_pixel(x + dx, y) + fetch_bayer_pixel(x, y - dy) + fetch_bayer_pixel(x, y + dy));
+        b = 0.25 * (fetch_bayer_pixel(x - dx, y - dy) + fetch_bayer_pixel(x + dx, y - dy) + fetch_bayer_pixel(x - dx, y + dy) + fetch_bayer_pixel(x + dx, y + dy));
+    } else if (idx < 3.5) {
+        /* Green */
+        g = fetch_bayer_pixel(x, y);
+        r = 0.5 * (fetch_bayer_pixel(x - dx, y) + fetch_bayer_pixel(x + dx, y));
+        b = 0.5 * (fetch_bayer_pixel(x, y - dy) + fetch_bayer_pixel(x, y + dy));
     }
 
     return vec3(r, g, b);
